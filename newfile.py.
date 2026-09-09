@@ -1,0 +1,884 @@
+import secrets
+import json
+import os
+
+from kivy.app import App
+from kivy.clock import Clock
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.anchorlayout import AnchorLayout
+from kivy.graphics import Color, RoundedRectangle
+
+
+# ============================================================
+# WIN GO EDUCATIONAL SIMULATOR
+# Virtual/demo game only — no real-money betting.
+# ============================================================
+
+
+# ============================================================
+# GAME ENGINE
+# ============================================================
+
+class GameEngine:
+
+    def __init__(self):
+        self.number = None
+        self.colour = None
+        self.size = None
+
+    def generate_result(self):
+
+        # Random number from 0 to 9.
+        # No prediction pattern or previous-result analysis.
+        self.number = secrets.randbelow(10)
+
+        # Colour rules
+        if self.number == 0:
+            self.colour = "Red + Violet"
+
+        elif self.number == 5:
+            self.colour = "Green + Violet"
+
+        elif self.number in [1, 3, 7, 9]:
+            self.colour = "Green"
+
+        else:
+            self.colour = "Red"
+
+        # Big / Small rules
+        if self.number <= 4:
+            self.size = "Small"
+        else:
+            self.size = "Big"
+
+        return self.number, self.colour, self.size
+
+
+# ============================================================
+# MAIN APP
+# ============================================================
+
+class WinGoApp(App):
+
+    def build(self):
+
+        self.game = GameEngine()
+
+        # -----------------------------
+        # Game variables
+        # -----------------------------
+
+        self.round_number = 1
+        self.seconds_left = 30
+
+        self.player_choice = None
+
+        self.result_history = []
+
+        self.history_file = "wingo_history.json"
+
+        self.load_history()
+
+        # -----------------------------
+        # Root layout
+        # -----------------------------
+
+        root = AnchorLayout(
+            anchor_x="center",
+            anchor_y="top",
+            padding=15
+        )
+
+        content = BoxLayout(
+            orientation="vertical",
+            spacing=10,
+            size_hint_y=None
+        )
+
+        content.bind(
+            minimum_height=content.setter("height")
+        )
+
+        # ====================================================
+        # TITLE
+        # ====================================================
+
+        title = Label(
+            text="WIN GO EDUCATIONAL SIMULATOR",
+            font_size=22,
+            bold=True,
+            size_hint_y=None,
+            height=45
+        )
+
+        content.add_widget(title)
+
+        # ====================================================
+        # ROUND
+        # ====================================================
+
+        self.round_label = Label(
+            text="Round 1",
+            font_size=18,
+            size_hint_y=None,
+            height=35
+        )
+
+        content.add_widget(self.round_label)
+
+        # ====================================================
+        # TIMER
+        # ====================================================
+
+        self.timer_label = Label(
+            text="30",
+            font_size=32,
+            bold=True,
+            size_hint_y=None,
+            height=55
+        )
+
+        content.add_widget(self.timer_label)
+
+        # ====================================================
+        # STATUS
+        # ====================================================
+
+        self.status_label = Label(
+            text="Select a virtual option",
+            font_size=16,
+            size_hint_y=None,
+            height=35
+        )
+
+        content.add_widget(self.status_label)
+
+        # ====================================================
+        # BIG / SMALL
+        # ====================================================
+
+        size_title = Label(
+            text="BIG / SMALL",
+            bold=True,
+            size_hint_y=None,
+            height=30
+        )
+
+        content.add_widget(size_title)
+
+        size_layout = BoxLayout(
+            orientation="horizontal",
+            spacing=8,
+            size_hint_y=None,
+            height=50
+        )
+
+        self.small_button = Button(
+            text="SMALL",
+            font_size=16
+        )
+
+        self.big_button = Button(
+            text="BIG",
+            font_size=16
+        )
+
+        size_layout.add_widget(self.small_button)
+        size_layout.add_widget(self.big_button)
+
+        content.add_widget(size_layout)
+
+        self.small_button.bind(
+            on_press=lambda x: self.player_selection("Small")
+        )
+
+        self.big_button.bind(
+            on_press=lambda x: self.player_selection("Big")
+        )
+
+        # ====================================================
+        # COLOUR BUTTONS
+        # ====================================================
+
+        colour_title = Label(
+            text="COLOUR",
+            bold=True,
+            size_hint_y=None,
+            height=30
+        )
+
+        content.add_widget(colour_title)
+
+        colour_layout = BoxLayout(
+            orientation="horizontal",
+            spacing=8,
+            size_hint_y=None,
+            height=50
+        )
+
+        self.red_button = Button(
+            text="RED",
+            font_size=16
+        )
+
+        self.green_button = Button(
+            text="GREEN",
+            font_size=16
+        )
+
+        self.violet_button = Button(
+            text="VIOLET",
+            font_size=16
+        )
+
+        colour_layout.add_widget(self.red_button)
+        colour_layout.add_widget(self.green_button)
+        colour_layout.add_widget(self.violet_button)
+
+        content.add_widget(colour_layout)
+
+        # Fill colour buttons
+        self.set_button_color(
+            self.red_button,
+            (0.85, 0.05, 0.05, 1)
+        )
+
+        self.set_button_color(
+            self.green_button,
+            (0.05, 0.65, 0.15, 1)
+        )
+
+        self.set_button_color(
+            self.violet_button,
+            (0.45, 0.15, 0.75, 1)
+        )
+
+        self.red_button.bind(
+            on_press=lambda x: self.player_selection("Red")
+        )
+
+        self.green_button.bind(
+            on_press=lambda x: self.player_selection("Green")
+        )
+
+        self.violet_button.bind(
+            on_press=lambda x: self.player_selection("Violet")
+        )
+
+        # ====================================================
+        # NUMBER TITLE
+        # ====================================================
+
+        number_title = Label(
+            text="NUMBER",
+            bold=True,
+            size_hint_y=None,
+            height=30
+        )
+
+        content.add_widget(number_title)
+
+        # ====================================================
+        # NUMBER GRID
+        # ====================================================
+
+        number_grid = GridLayout(
+            cols=5,
+            spacing=7,
+            size_hint_y=None,
+            height=100
+        )
+
+        self.number_buttons = []
+
+        for i in range(10):
+
+            btn = Button(
+                text=str(i),
+                font_size=18,
+                bold=True
+            )
+
+            self.number_buttons.append(btn)
+
+            # Remove default Kivy button background
+            btn.background_normal = ""
+            btn.background_down = ""
+            btn.background_color = (0, 0, 0, 0)
+
+            # Number colour rules
+
+            if i == 0:
+
+                self.create_split_color(
+                    btn,
+                    (0.85, 0.05, 0.05, 1),
+                    (0.45, 0.15, 0.75, 1)
+                )
+
+            elif i == 5:
+
+                self.create_split_color(
+                    btn,
+                    (0.05, 0.65, 0.15, 1),
+                    (0.45, 0.15, 0.75, 1)
+                )
+
+            elif i in [1, 3, 7, 9]:
+
+                self.set_button_color(
+                    btn,
+                    (0.05, 0.65, 0.15, 1)
+                )
+
+            else:
+
+                self.set_button_color(
+                    btn,
+                    (0.85, 0.05, 0.05, 1)
+                )
+
+            btn.bind(
+                on_press=lambda instance,
+                number=i: self.player_selection(
+                    f"Number {number}"
+                )
+            )
+
+            number_grid.add_widget(btn)
+
+        content.add_widget(number_grid)
+
+        # ====================================================
+        # PLAYER SELECTION
+        # ====================================================
+
+        selection_title = Label(
+            text="YOUR SELECTION",
+            bold=True,
+            size_hint_y=None,
+            height=30
+        )
+
+        content.add_widget(selection_title)
+
+        self.selection_label = Label(
+            text="None",
+            font_size=16,
+            size_hint_y=None,
+            height=35
+        )
+
+        content.add_widget(self.selection_label)
+
+        # ====================================================
+        # PUBLIC RESULT
+        # ====================================================
+
+        result_title = Label(
+            text="RESULT",
+            bold=True,
+            size_hint_y=None,
+            height=30
+        )
+
+        content.add_widget(result_title)
+
+        self.result_label = Label(
+            text="Waiting...",
+            font_size=18,
+            bold=True,
+            size_hint_y=None,
+            height=40
+        )
+
+        content.add_widget(self.result_label)
+
+        # ====================================================
+        # DEVELOPER DEBUG
+        # ====================================================
+
+        debug_title = Label(
+            text="DEVELOPER DEBUG (READ ONLY)",
+            bold=True,
+            size_hint_y=None,
+            height=30
+        )
+
+        content.add_widget(debug_title)
+
+        self.debug_label = Label(
+            text="Result hidden until 10 seconds remain",
+            font_size=14,
+            size_hint_y=None,
+            height=45
+        )
+
+        content.add_widget(self.debug_label)
+
+        # ====================================================
+        # RESULT HISTORY
+        # ====================================================
+
+        history_title = Label(
+            text="RESULT HISTORY",
+            bold=True,
+            size_hint_y=None,
+            height=30
+        )
+
+        content.add_widget(history_title)
+
+        self.history_label = Label(
+            text="No results yet.",
+            font_size=13,
+            size_hint_y=None,
+            height=160,
+            halign="left",
+            valign="top"
+        )
+
+        self.history_label.bind(
+            size=lambda instance, value:
+            setattr(
+                instance,
+                "text_size",
+                (instance.width, None)
+            )
+        )
+
+        content.add_widget(self.history_label)
+
+        # ====================================================
+        # ADD CONTENT
+        # ====================================================
+
+        root.add_widget(content)
+
+        # ====================================================
+        # START GAME
+        # ====================================================
+
+        self.start_round()
+
+        return root
+
+    # ========================================================
+    # FILLED BUTTON
+    # ========================================================
+
+    def set_button_color(self, button, color):
+
+        # Remove Kivy's default button background
+        button.background_normal = ""
+        button.background_down = ""
+        button.background_color = (0, 0, 0, 0)
+
+        with button.canvas.before:
+
+            Color(*color)
+
+            button.bg = RoundedRectangle(
+                pos=button.pos,
+                size=button.size,
+                radius=[10]
+            )
+
+        button.bind(
+            pos=lambda instance, value:
+            setattr(
+                button.bg,
+                "pos",
+                value
+            ),
+
+            size=lambda instance, value:
+            setattr(
+                button.bg,
+                "size",
+                value
+            )
+        )
+
+    # ========================================================
+    # SPLIT COLOUR BUTTON
+    # ========================================================
+
+    def create_split_color(
+        self,
+        button,
+        first_color,
+        second_color
+    ):
+
+        button.background_normal = ""
+        button.background_down = ""
+        button.background_color = (0, 0, 0, 0)
+
+        with button.canvas.before:
+
+            # First half
+            Color(*first_color)
+
+            button.first_bg = RoundedRectangle(
+                pos=button.pos,
+                size=(
+                    button.width / 2,
+                    button.height
+                ),
+                radius=[10]
+            )
+
+            # Second half
+            Color(*second_color)
+
+            button.second_bg = RoundedRectangle(
+                pos=(
+                    button.x + button.width / 2,
+                    button.y
+                ),
+                size=(
+                    button.width / 2,
+                    button.height
+                ),
+                radius=[10]
+            )
+
+        def update_split(instance, value):
+
+            button.first_bg.pos = button.pos
+
+            button.first_bg.size = (
+                button.width / 2,
+                button.height
+            )
+
+            button.second_bg.pos = (
+                button.x + button.width / 2,
+                button.y
+            )
+
+            button.second_bg.size = (
+                button.width / 2,
+                button.height
+            )
+
+        button.bind(
+            pos=update_split,
+            size=update_split
+        )
+
+    # ========================================================
+    # START ROUND
+    # ========================================================
+
+    def start_round(self, *args):
+
+        self.seconds_left = 30
+        self.player_choice = None
+
+        self.round_label.text = (
+            f"Round {self.round_number}"
+        )
+
+        self.timer_label.text = "30"
+
+        self.status_label.text = (
+            "Select a virtual option"
+        )
+
+        self.selection_label.text = "None"
+
+        self.result_label.text = "Waiting..."
+
+        self.debug_label.text = (
+            "Result hidden until 10 seconds remain"
+        )
+
+        # Generate exactly ONE result
+        self.game.generate_result()
+
+        self.enable_buttons()
+
+        # Start timer
+        Clock.schedule_interval(
+            self.update_timer,
+            1
+        )
+
+    # ========================================================
+    # TIMER
+    # ========================================================
+
+    def update_timer(self, dt):
+
+        self.seconds_left -= 1
+
+        self.timer_label.text = str(
+            self.seconds_left
+        )
+
+        # ----------------------------
+        # Developer result
+        # ----------------------------
+
+        if self.seconds_left == 10:
+
+            self.show_developer_result()
+
+        # ----------------------------
+        # Close selection
+        # ----------------------------
+
+        if self.seconds_left == 5:
+
+            self.disable_buttons()
+
+            self.status_label.text = (
+                "Selection closed"
+            )
+
+        # ----------------------------
+        # Publish result
+        # ----------------------------
+
+        if self.seconds_left == 0:
+
+            Clock.unschedule(
+                self.update_timer
+            )
+
+            self.publish_result()
+
+            Clock.schedule_once(
+                self.next_round,
+                2
+            )
+
+    # ========================================================
+    # DEVELOPER DEBUG
+    # ========================================================
+
+    def show_developer_result(self):
+
+        self.debug_label.text = (
+            f"READ ONLY\n"
+            f"Number: {self.game.number}\n"
+            f"Colour: {self.game.colour}\n"
+            f"Size: {self.game.size}"
+        )
+
+    # ========================================================
+    # PUBLIC RESULT
+    # ========================================================
+
+    def publish_result(self):
+
+        self.result_label.text = (
+            f"Number: {self.game.number}   |   "
+            f"{self.game.colour}   |   "
+            f"{self.game.size}"
+        )
+
+        self.status_label.text = (
+            "Round completed"
+        )
+
+        # Save result
+        result = {
+            "period": self.round_number,
+            "number": self.game.number,
+            "colour": self.game.colour,
+            "size": self.game.size
+        }
+
+        self.result_history.insert(
+            0,
+            result
+        )
+
+        # Keep latest 10 results
+        self.result_history = (
+            self.result_history[:10]
+        )
+
+        # Save to JSON
+        self.save_history()
+
+        # Update screen
+        self.update_history()
+
+    # ========================================================
+    # HISTORY DISPLAY
+    # ========================================================
+
+    def update_history(self):
+
+        if not hasattr(
+            self,
+            "history_label"
+        ):
+            return
+
+        if not self.result_history:
+
+            self.history_label.text = (
+                "No results yet."
+            )
+
+            return
+
+        text = ""
+
+        for item in self.result_history:
+
+            text += (
+                f"Period {item['period']}   "
+                f"Number: {item['number']}   "
+                f"{item['colour']}   "
+                f"{item['size']}\n"
+            )
+
+        self.history_label.text = text
+
+    # ========================================================
+    # LOAD HISTORY
+    # ========================================================
+
+    def load_history(self):
+
+        if not os.path.exists(
+            self.history_file
+        ):
+            self.result_history = []
+            return
+
+        try:
+
+            with open(
+                self.history_file,
+                "r",
+                encoding="utf-8"
+            ) as file:
+
+                data = json.load(file)
+
+                if isinstance(data, list):
+
+                    self.result_history = data[:10]
+
+                else:
+
+                    self.result_history = []
+
+        except Exception:
+
+            self.result_history = []
+
+    # ========================================================
+    # SAVE HISTORY
+    # ========================================================
+
+    def save_history(self):
+
+        try:
+
+            with open(
+                self.history_file,
+                "w",
+                encoding="utf-8"
+            ) as file:
+
+                json.dump(
+                    self.result_history,
+                    file,
+                    indent=4
+                )
+
+        except Exception as error:
+
+            print(
+                "History save error:",
+                error
+            )
+
+    # ========================================================
+    # PLAYER SELECTION
+    # ========================================================
+
+    def player_selection(self, choice):
+
+        # Selection closed
+        if self.seconds_left <= 5:
+
+            self.status_label.text = (
+                "Selection is closed"
+            )
+
+            return
+
+        self.player_choice = choice
+
+        self.selection_label.text = (
+            str(choice)
+        )
+
+        self.status_label.text = (
+            "Virtual selection recorded"
+        )
+
+    # ========================================================
+    # DISABLE BUTTONS
+    # ========================================================
+
+    def disable_buttons(self):
+
+        self.small_button.disabled = True
+        self.big_button.disabled = True
+
+        self.red_button.disabled = True
+        self.green_button.disabled = True
+        self.violet_button.disabled = True
+
+        for button in self.number_buttons:
+
+            button.disabled = True
+
+    # ========================================================
+    # ENABLE BUTTONS
+    # ========================================================
+
+    def enable_buttons(self):
+
+        self.small_button.disabled = False
+        self.big_button.disabled = False
+
+        self.red_button.disabled = False
+        self.green_button.disabled = False
+        self.violet_button.disabled = False
+
+        for button in self.number_buttons:
+
+            button.disabled = False
+
+    # ========================================================
+    # NEXT ROUND
+    # ========================================================
+
+    def next_round(self, dt):
+
+        self.round_number += 1
+
+        self.start_round()
+
+
+# ============================================================
+# RUN APPLICATION
+# ============================================================
+
+if __name__ == "__main__":
+
+    WinGoApp().run()
